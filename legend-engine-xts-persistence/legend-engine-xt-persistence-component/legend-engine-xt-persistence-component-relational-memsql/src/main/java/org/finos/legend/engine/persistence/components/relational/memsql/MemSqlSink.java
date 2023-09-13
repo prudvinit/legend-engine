@@ -34,7 +34,7 @@ import org.finos.legend.engine.persistence.components.relational.ansi.AnsiSqlSin
 import org.finos.legend.engine.persistence.components.relational.ansi.optimizer.LowerCaseOptimizer;
 import org.finos.legend.engine.persistence.components.relational.ansi.optimizer.UpperCaseOptimizer;
 import org.finos.legend.engine.persistence.components.relational.api.RelationalConnection;
-import org.finos.legend.engine.persistence.components.relational.executor.RelationalExecutionHelper;
+import org.finos.legend.engine.persistence.components.executor.RelationalExecutionHelper;
 import org.finos.legend.engine.persistence.components.relational.executor.RelationalExecutor;
 import org.finos.legend.engine.persistence.components.relational.jdbc.JdbcConnection;
 import org.finos.legend.engine.persistence.components.relational.jdbc.JdbcHelper;
@@ -156,7 +156,7 @@ public class MemSqlSink extends AnsiSqlSink
             LOGICAL_PLAN_VISITOR_BY_CLASS,
             (executor, sink, dataset) -> sink.doesTableExist(dataset),
             VALIDATE_MAIN_DATASET_SCHEMA,
-            (v, w, x, y, z) ->
+            (x, y, z) ->
             {
                 throw new UnsupportedOperationException();
             });

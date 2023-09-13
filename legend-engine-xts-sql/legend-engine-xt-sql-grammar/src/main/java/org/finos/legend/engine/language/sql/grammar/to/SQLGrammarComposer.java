@@ -18,6 +18,7 @@ import org.eclipse.collections.api.map.MutableMap;
 import org.eclipse.collections.impl.list.mutable.FastList;
 import org.eclipse.collections.impl.map.mutable.UnifiedMap;
 import org.eclipse.collections.impl.tuple.Tuples;
+import org.eclipse.collections.impl.utility.ListIterate;
 import org.finos.legend.engine.protocol.sql.metamodel.*;
 
 import java.util.List;
@@ -45,7 +46,8 @@ public class SQLGrammarComposer
             Tuples.pair(ArithmeticType.SUBTRACT, "-"),
             Tuples.pair(ArithmeticType.MULTIPLY, "*"),
             Tuples.pair(ArithmeticType.DIVIDE, "/"),
-            Tuples.pair(ArithmeticType.MODULUS, "*")
+            Tuples.pair(ArithmeticType.MODULUS, "%"),
+            Tuples.pair(ArithmeticType.POWER, "^")
     );
 
     private final MutableMap<JoinType, String> joins = UnifiedMap.newMapWith(
@@ -355,7 +357,9 @@ public class SQLGrammarComposer
             @Override
             public String visit(ColumnType val)
             {
-                return val.name;
+                List<String> parameters = ListIterate.collect(val.parameters, Object::toString);
+                String parameterString = parameters.isEmpty() ? "" : parameters.stream().collect(Collectors.joining(", ", "(", ")"));
+                return val.name + parameterString;
             }
 
             @Override

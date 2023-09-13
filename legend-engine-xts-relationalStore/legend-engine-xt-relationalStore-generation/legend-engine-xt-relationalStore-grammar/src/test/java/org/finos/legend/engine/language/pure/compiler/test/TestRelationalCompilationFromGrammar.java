@@ -2172,26 +2172,30 @@ public class TestRelationalCompilationFromGrammar extends TestCompilationFromGra
                 "{\n" +
                 "  store: relational::graphFetch::dbInc;\n" +
                 "  type: H2;\n" +
-                "  specification: LocalH2\n" +
+                "  specification: Static\n" +
                 "  {\n" +
-                "    testDataSetupSqls: [\n" +
-                "      'Drop table if exists firmTable;\\nCreate Table firmTable(FirmCode INT, FirmName VARCHAR(200));\\nInsert into firmTable (FirmCode, FirmName) values (101,\\'finos\\');\\nInsert into firmTable (FirmCode, FirmName) values (200,\\'goldman_Sachs\\');'\n" +
-                "      ];\n" +
+                "    name: 'name';\n" +
+                "    host: 'host';\n" +
+                "    port: 1234;\n" +
                 "  };\n" +
-                "  auth: DefaultH2;\n" +
+                "  auth: Test\n" +
+                "  {\n" +
+                "  };\n" +
                 "}\n" +
                 "\n" +
                 "RelationalDatabaseConnection relational::graphFetch::SecondRelationalConnection\n" +
                 "{\n" +
                 "  store: relational::graphFetch::dbInc;\n" +
                 "  type: H2;\n" +
-                "  specification: LocalH2\n" +
+                "  specification: Static\n" +
                 "  {\n" +
-                "    testDataSetupSqls: [\n" +
-                "      'Drop table if exists firmTable;\\nCreate Table firmTable(FirmCode INT, FirmName VARCHAR(200));\\nInsert into firmTable (FirmCode, FirmName) values (001,\\'Alloy_Engineering\\');\\nInsert into firmTable (FirmCode, FirmName) values (102,\\'legend-engine\\');\\n'\n" +
-                "      ];\n" +
+                "    name: 'name';\n" +
+                "    host: 'host';\n" +
+                "    port: 1234;\n" +
                 "  };\n" +
-                "  auth: DefaultH2;\n" +
+                "  auth: Test\n" +
+                "  {\n" +
+                "  };\n" +
                 "}\n" +
                 "\n" +
                 "ModelChainConnection relational::graphFetch::OneMappingConnection\n" +
@@ -2221,6 +2225,42 @@ public class TestRelationalCompilationFromGrammar extends TestCompilationFromGra
                 "      connection_1: relational::graphFetch::OneMappingConnection\n" +
                 "    ]\n" +
                 "  ];\n" +
-                "}\n",null, Collections.singletonList("COMPILATION error at [97:21-70]: Multiple RelationalDatabaseConnections are Not Supported for the same Store - relational::graphFetch::dbInc"));
+                "}\n", null, Collections.singletonList("COMPILATION error at [101:21-70]: Multiple RelationalDatabaseConnections are Not Supported for the same Store - relational::graphFetch::dbInc"));
+    }
+    
+    @Test
+    public void testCompilationMissingEnumMapping() throws Exception
+    {
+        Pair<PureModelContextData, PureModel> res = test(
+                "###Relational\n" +
+                        "Database test::DB\n" +
+                        "(\n" +
+                        "  Table employee\n" +
+                        "  (\n" +
+                        "    type VARCHAR(200)\n" +
+                        "  )\n" +
+                        ")\n" +
+                        "###Pure\n" +
+                        "Enum test::EmployeeType\n" +
+                        "{\n" +
+                        "  FULL_TIME\n" +
+                        "}\n" +
+                        "Class test::Employee\n" +
+                        "{\n" +
+                        "  type: test::EmployeeType[1];\n" +
+                        "}\n" +
+                        "###Mapping\n" +
+                        "Mapping test::Map\n" +
+                        "(\n" +
+                        "  *test::Employee: Relational\n" +
+                        "  {\n" +
+                        "    ~mainTable [test::DB]employee\n" +
+                        "    type: [test::DB]employee.type\n" +
+                        "  }\n" +
+                        ")", null, Arrays.asList("COMPILATION error at [24:9-33]: Missing an EnumerationMapping for the enum property 'type'. Enum properties require an EnumerationMapping in order to transform the store values into the Enum."));
+
+        MutableList<Warning> warnings = res.getTwo().getWarnings();
+        Assert.assertEquals(1, warnings.size());
+        Assert.assertEquals("{\"sourceInformation\":{\"sourceId\":\"test::Map\",\"startLine\":24,\"startColumn\":9,\"endLine\":24,\"endColumn\":33},\"message\":\"Missing an EnumerationMapping for the enum property 'type'. Enum properties require an EnumerationMapping in order to transform the store values into the Enum.\"}", new ObjectMapper().writeValueAsString(warnings.get(0)));
     }
 }

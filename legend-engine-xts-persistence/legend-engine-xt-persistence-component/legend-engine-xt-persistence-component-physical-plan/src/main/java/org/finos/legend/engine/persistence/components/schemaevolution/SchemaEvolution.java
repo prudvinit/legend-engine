@@ -23,6 +23,7 @@ import org.finos.legend.engine.persistence.components.ingestmode.NontemporalDelt
 import org.finos.legend.engine.persistence.components.ingestmode.NontemporalSnapshotAbstract;
 import org.finos.legend.engine.persistence.components.ingestmode.UnitemporalDeltaAbstract;
 import org.finos.legend.engine.persistence.components.ingestmode.UnitemporalSnapshotAbstract;
+import org.finos.legend.engine.persistence.components.ingestmode.BulkLoadAbstract;
 import org.finos.legend.engine.persistence.components.ingestmode.audit.AuditingVisitors;
 import org.finos.legend.engine.persistence.components.ingestmode.merge.MergeStrategyVisitors;
 import org.finos.legend.engine.persistence.components.ingestmode.transactionmilestoning.BatchIdAbstract;
@@ -31,6 +32,9 @@ import org.finos.legend.engine.persistence.components.ingestmode.transactionmile
 import org.finos.legend.engine.persistence.components.ingestmode.transactionmilestoning.TransactionMilestoningVisitor;
 import org.finos.legend.engine.persistence.components.ingestmode.validitymilestoning.ValidDateTimeAbstract;
 import org.finos.legend.engine.persistence.components.ingestmode.validitymilestoning.ValidityMilestoningVisitor;
+import org.finos.legend.engine.persistence.components.ingestmode.validitymilestoning.derivation.SourceSpecifiesFromAndThruDateTimeAbstract;
+import org.finos.legend.engine.persistence.components.ingestmode.validitymilestoning.derivation.SourceSpecifiesFromDateTimeAbstract;
+import org.finos.legend.engine.persistence.components.ingestmode.validitymilestoning.derivation.ValidityDerivationVisitor;
 import org.finos.legend.engine.persistence.components.logicalplan.LogicalPlan;
 import org.finos.legend.engine.persistence.components.logicalplan.datasets.Dataset;
 import org.finos.legend.engine.persistence.components.logicalplan.datasets.Field;
@@ -43,6 +47,7 @@ import org.finos.legend.engine.persistence.components.util.Capability;
 import org.finos.legend.engine.persistence.components.util.SchemaEvolutionCapability;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -334,15 +339,21 @@ public class SchemaEvolution
         @Override
         public Set<String> visitBitemporalSnapshot(BitemporalSnapshotAbstract bitemporalSnapshot)
         {
-            return Collections.emptySet();
+            return bitemporalSnapshot.validityMilestoning().accept(VALIDITY_FIELDS_TO_IGNORE_IN_STAGING);
         }
 
         @Override
         public Set<String> visitBitemporalDelta(BitemporalDeltaAbstract bitemporalDelta)
         {
-            return bitemporalDelta.mergeStrategy().accept(MergeStrategyVisitors.EXTRACT_DELETE_FIELD)
-                    .map(Collections::singleton)
-                    .orElse(Collections.emptySet());
+            Set<String> fieldsToIgnore = bitemporalDelta.validityMilestoning().accept(VALIDITY_FIELDS_TO_IGNORE_IN_STAGING);
+            bitemporalDelta.mergeStrategy().accept(MergeStrategyVisitors.EXTRACT_DELETE_FIELD).ifPresent(fieldsToIgnore::add);
+            return fieldsToIgnore;
+        }
+
+        @Override
+        public Set<String> visitBulkLoad(BulkLoadAbstract bulkLoad)
+        {
+            return Collections.emptySet();
         }
     };
 
@@ -401,6 +412,12 @@ public class SchemaEvolution
             fieldsToIgnore.addAll(bitemporalDelta.validityMilestoning().accept(VALIDITY_FIELDS_TO_IGNORE));
             return fieldsToIgnore;
         }
+
+        @Override
+        public Set<String> visitBulkLoad(BulkLoadAbstract bulkLoad)
+        {
+            return Collections.emptySet();
+        }
     };
 
     // transaction milestoning visitors
@@ -447,6 +464,29 @@ public class SchemaEvolution
             Set<String> fieldsToIgnore = new HashSet<>();
             fieldsToIgnore.add(validDateTime.dateTimeFromName());
             fieldsToIgnore.add(validDateTime.dateTimeThruName());
+            return fieldsToIgnore;
+        }
+    };
+
+    private static final ValidityMilestoningVisitor<Set<String>> VALIDITY_FIELDS_TO_IGNORE_IN_STAGING = new ValidityMilestoningVisitor<Set<String>>()
+    {
+        @Override
+        public Set<String> visitDateTime(ValidDateTimeAbstract validDateTime)
+        {
+            Set<String> fieldsToIgnore = validDateTime.validityDerivation().accept(new ValidityDerivationVisitor<Set<String>>()
+            {
+                @Override
+                public Set<String> visitSourceSpecifiesFromDateTime(SourceSpecifiesFromDateTimeAbstract sourceSpecifiesFromDateTime)
+                {
+                    return new HashSet<>(Arrays.asList(sourceSpecifiesFromDateTime.sourceDateTimeFromField()));
+                }
+
+                @Override
+                public Set<String> visitSourceSpecifiesFromAndThruDateTime(SourceSpecifiesFromAndThruDateTimeAbstract sourceSpecifiesFromAndThruDateTime)
+                {
+                    return new HashSet<>(Arrays.asList(sourceSpecifiesFromAndThruDateTime.sourceDateTimeFromField(), sourceSpecifiesFromAndThruDateTime.sourceDateTimeThruField()));
+                }
+            });
             return fieldsToIgnore;
         }
     };

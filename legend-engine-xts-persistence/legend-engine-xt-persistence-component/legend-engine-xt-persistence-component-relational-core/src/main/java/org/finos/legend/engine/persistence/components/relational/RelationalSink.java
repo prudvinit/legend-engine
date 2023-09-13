@@ -14,6 +14,7 @@
 
 package org.finos.legend.engine.persistence.components.relational;
 
+import org.finos.legend.engine.persistence.components.common.Datasets;
 import org.finos.legend.engine.persistence.components.executor.Executor;
 import org.finos.legend.engine.persistence.components.logicalplan.LogicalPlanNode;
 import org.finos.legend.engine.persistence.components.logicalplan.datasets.DataType;
@@ -21,8 +22,9 @@ import org.finos.legend.engine.persistence.components.logicalplan.datasets.Datas
 import org.finos.legend.engine.persistence.components.logicalplan.datasets.Field;
 import org.finos.legend.engine.persistence.components.logicalplan.datasets.FieldType;
 import org.finos.legend.engine.persistence.components.optimizer.Optimizer;
+import org.finos.legend.engine.persistence.components.relational.api.IngestorResult;
 import org.finos.legend.engine.persistence.components.relational.api.RelationalConnection;
-import org.finos.legend.engine.persistence.components.relational.executor.RelationalExecutionHelper;
+import org.finos.legend.engine.persistence.components.executor.RelationalExecutionHelper;
 import org.finos.legend.engine.persistence.components.relational.sql.TabularData;
 import org.finos.legend.engine.persistence.components.relational.sqldom.SqlGen;
 import org.finos.legend.engine.persistence.components.sink.Sink;
@@ -183,6 +185,8 @@ public abstract class RelationalSink implements Sink
 
     public interface ConstructDatasetFromDatabase
     {
-        Dataset execute(Executor<SqlGen, TabularData, SqlPlan> executor, RelationalExecutionHelper sink, String tableName, String schemaName, String databaseName);
+        Dataset execute(Executor<SqlGen, TabularData, SqlPlan> executor, RelationalExecutionHelper sink, Dataset dataset);
     }
+
+    public abstract IngestorResult performBulkLoad(Datasets datasets, Executor<SqlGen, TabularData, SqlPlan> executor, SqlPlan sqlPlan, Map<String, String> placeHolderKeyValues);
 }

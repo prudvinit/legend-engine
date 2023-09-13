@@ -155,18 +155,28 @@ function meta::relational::executionPlan::platformBinding::legendJava::relationa
    relationalExtensionsWithLegendJavaPlatformBinding([])
 }
 
-function meta::relational::executionPlan::platformBinding::legendJava::relationalExtensionsWithLegendJavaPlatformBinding(externalFormatDescriptors: meta::external::shared::format::executionPlan::platformBinding::legendJava::ExternalFormatLegendJavaPlatformBindingDescriptor[*]): Extension[*]
+function meta::relational::executionPlan::platformBinding::legendJava::relationalExtensionsWithLegendJavaPlatformBinding(externalFormatDescriptors: meta::external::format::shared::executionPlan::platformBinding::legendJava::ExternalFormatLegendJavaPlatformBindingDescriptor[*]): Extension[*]
 {
    [
-      meta::relational::extension::relationalExtension('relational'),
-      meta::pure::executionPlan::platformBinding::platformBindingExtension([
+      meta::relational::extension::relationalExtension(),
+      meta::pure::executionPlan::platformBinding::platformBindingExtension('PlatformBinding - LegendJava - InMemory, Relational, ExternalFormatCore, ' + $externalFormatDescriptors->map(fd | 'ExternalFormat' + $fd.externalFormatContract.id)->joinStrings(', '), [
          meta::pure::executionPlan::platformBinding::legendJava::legendJavaPlatformBinding([
             meta::pure::mapping::modelToModel::executionPlan::platformBinding::legendJava::inMemoryLegendJavaPlatformBindingExtension(),
             meta::relational::executionPlan::platformBinding::legendJava::relationalLegendJavaPlatformBindingExtension(),
-            meta::external::shared::format::executionPlan::platformBinding::legendJava::bindingLegendJavaPlatformBindingExtension($externalFormatDescriptors)
+            meta::external::format::shared::executionPlan::platformBinding::legendJava::bindingLegendJavaPlatformBindingExtension(),
+            meta::external::format::shared::executionPlan::platformBinding::legendJava::externalFormatLegendJavaPlatformBindingExtension($externalFormatDescriptors)
          ])
       ]) 
    ]  
+}
+
+function meta::relational::executionPlan::platformBinding::legendJava::relationalExtensionJavaPlatformBinding(): Extension[1]
+{
+    meta::pure::executionPlan::platformBinding::platformBindingExtension('PlatformBinding - LegendJava - Relational', [
+        meta::pure::executionPlan::platformBinding::legendJava::legendJavaPlatformBinding([
+            meta::relational::executionPlan::platformBinding::legendJava::relationalLegendJavaPlatformBindingExtension()
+        ])
+    ]);
 }
 
 ###Pure
@@ -179,19 +189,15 @@ import meta::pure::extension::*;
 import meta::pure::extension::configuration::*;
 import meta::relational::executionPlan::platformBinding::legendJava::*;
 
-function <<LocalPlatformBinding.TestPlanBinder>> meta::relational::executionPlan::platformBinding::legendJava::bindRelationalTestPlanToPlatform(): LocalPlatformBinder[1]
+function <<LocalPlatformBinding.TestPlanBinder, doc.deprecated>> meta::relational::executionPlan::platformBinding::legendJava::bindRelationalTestPlanToPlatform(): LocalPlatformBinder[1]
 {
    ^LocalPlatformBinder
    (
       overrides = [],
-      
-      bindingFunction = {plan: ExecutionPlan[1], extensions: Extension[*] |
-         
-         let extensionsWithPlatformBindings = $extensions->concatenate(platformBindingExtension([legendJavaPlatformBinding([relationalLegendJavaPlatformBindingExtension()])]));
 
-         // Using LegendJava as the default for local platform binding
-         generatePlatformCode($plan, legendJavaPlatformBindingId(), ^LegendJavaPlatformBindingConfig(), $extensionsWithPlatformBindings);
-      
+      bindingFunction = {plan: ExecutionPlan[1], extensions: Extension[*] |
+         fail('This flow is not supported');
+         $plan;
       }
    ) 
 }

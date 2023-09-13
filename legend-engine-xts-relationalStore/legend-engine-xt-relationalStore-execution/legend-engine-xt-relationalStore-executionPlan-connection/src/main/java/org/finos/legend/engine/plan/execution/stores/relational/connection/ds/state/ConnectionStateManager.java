@@ -27,6 +27,7 @@ import org.finos.legend.engine.plan.execution.stores.relational.connection.ds.Da
 import org.finos.legend.engine.plan.execution.stores.relational.connection.ds.DataSourceStatistics;
 import org.finos.legend.engine.plan.execution.stores.relational.connection.ds.DataSourceWithStatistics;
 import org.finos.legend.engine.shared.core.identity.Identity;
+import org.finos.legend.engine.shared.core.operational.prometheus.MetricsHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -236,7 +237,11 @@ public class ConnectionStateManager implements Closeable
         Set<Pair<String, DataSourceStatistics>> entriesToPurge = this.findUnusedPoolsOlderThan(duration);
         LOGGER.info("ConnectionStateManager.HouseKeeper : pools {} to be evicted", entriesToPurge.size());
         // step 2 - remove atomically - i.e remove iff the state has not been updated since it was read in step 1
-        entriesToPurge.forEach(pool -> this.atomicallyRemovePool(pool.getOne(), pool.getTwo()));
+        entriesToPurge.forEach(pool ->
+        {
+            this.atomicallyRemovePool(pool.getOne(), pool.getTwo());
+            MetricsHandler.removeConnectionMetrics(pool.getOne());
+        });
     }
 
     public int size()
@@ -303,6 +308,7 @@ public class ConnectionStateManager implements Closeable
             try
             {
                 instance.purge(durationInSeconds);
+                instance.updateMetricsForConnectionPools();
             }
             catch (Exception e)
             {
@@ -311,12 +317,26 @@ public class ConnectionStateManager implements Closeable
         }
     }
 
+    private void updateMetricsForConnectionPools()
+    {
+        this.connectionPools.forEach(p ->
+        {
+            MetricsHandler.setConnectionMetrics(p.getPoolName(), p.getActiveConnections(), p.getTotalConnections(), p.getIdleConnections());
+        });
+    }
+
     public DataSourceWithStatistics getDataSourceForIdentityIfAbsentBuild(IdentityState identityState, DataSourceSpecification dataSourceSpecification, Supplier<DataSource> dataSourceBuilder)
     {
 
         String principal = identityState.getIdentity().getName();
         String poolName = poolNameFor(identityState.getIdentity(), dataSourceSpecification.getConnectionKey());
         ConnectionKey connectionKey = dataSourceSpecification.getConnectionKey();
+
+        if (!identityState.isValid())
+        {
+            throw new RuntimeException(String.format("Invalid Identity found, cannot build connection pool for %s for %s",principal,connectionKey.shortId()));
+        }
+
         //why do we need getIfAbsentPut?  the first ever pool creation request will create a new Hikari Data Source
         //because we have configured hikari to fail fast a new connection will be created.
         //This will invoke the DriverWrapper connect method, for this method to create that test connection we need to pass minimal state
@@ -416,7 +436,10 @@ public class ConnectionStateManager implements Closeable
         {
             try
             {
-                this.connectionPools.keySet().forEach(k -> closeAndRemoveConnectionPool(k));
+                this.connectionPools.keySet().forEach(k ->
+                {
+                    closeAndRemoveConnectionPool(k);
+                });
                 EXECUTOR_SERVICE.shutdown();
                 EXECUTOR_SERVICE = null;
             }
@@ -433,6 +456,7 @@ public class ConnectionStateManager implements Closeable
         if (ds != null)
         {
             LOGGER.info("Closing {} has active connections ? {}", ds.getPoolName(), ds.hasActiveConnections());
+            MetricsHandler.removeConnectionMetrics(ds.getPoolName());
             ds.close();
         }
         return true;

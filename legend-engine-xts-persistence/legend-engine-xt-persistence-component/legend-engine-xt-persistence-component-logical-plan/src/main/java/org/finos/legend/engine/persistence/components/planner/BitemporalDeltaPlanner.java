@@ -35,21 +35,18 @@ import org.finos.legend.engine.persistence.components.logicalplan.conditions.Les
 import org.finos.legend.engine.persistence.components.logicalplan.conditions.Not;
 import org.finos.legend.engine.persistence.components.logicalplan.conditions.NotEquals;
 import org.finos.legend.engine.persistence.components.logicalplan.conditions.Or;
-import org.finos.legend.engine.persistence.components.logicalplan.datasets.DataType;
 import org.finos.legend.engine.persistence.components.logicalplan.datasets.Dataset;
 import org.finos.legend.engine.persistence.components.logicalplan.datasets.DatasetDefinition;
-import org.finos.legend.engine.persistence.components.logicalplan.datasets.Field;
-import org.finos.legend.engine.persistence.components.logicalplan.datasets.FieldType;
 import org.finos.legend.engine.persistence.components.logicalplan.datasets.Join;
 import org.finos.legend.engine.persistence.components.logicalplan.datasets.JoinOperation;
 import org.finos.legend.engine.persistence.components.logicalplan.datasets.Selection;
 import org.finos.legend.engine.persistence.components.logicalplan.operations.Create;
-import org.finos.legend.engine.persistence.components.logicalplan.operations.Drop;
 import org.finos.legend.engine.persistence.components.logicalplan.operations.Insert;
 import org.finos.legend.engine.persistence.components.logicalplan.operations.Operation;
 import org.finos.legend.engine.persistence.components.logicalplan.operations.Delete;
 import org.finos.legend.engine.persistence.components.logicalplan.operations.Update;
 import org.finos.legend.engine.persistence.components.logicalplan.operations.UpdateAbstract;
+import org.finos.legend.engine.persistence.components.logicalplan.operations.Drop;
 import org.finos.legend.engine.persistence.components.logicalplan.values.Case;
 import org.finos.legend.engine.persistence.components.logicalplan.values.FieldValue;
 import org.finos.legend.engine.persistence.components.logicalplan.values.FunctionImpl;
@@ -61,7 +58,6 @@ import org.finos.legend.engine.persistence.components.logicalplan.values.DiffBin
 import org.finos.legend.engine.persistence.components.util.Capability;
 import org.finos.legend.engine.persistence.components.util.LogicalPlanUtils;
 
-import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -72,6 +68,7 @@ import java.util.stream.Collectors;
 import static org.finos.legend.engine.persistence.components.common.StatisticName.ROWS_UPDATED;
 import static org.finos.legend.engine.persistence.components.common.StatisticName.ROWS_TERMINATED;
 import static org.finos.legend.engine.persistence.components.common.StatisticName.ROWS_INSERTED;
+import static org.finos.legend.engine.persistence.components.util.LogicalPlanUtils.UNDERSCORE;
 
 class BitemporalDeltaPlanner extends BitemporalPlanner
 {
@@ -79,8 +76,6 @@ class BitemporalDeltaPlanner extends BitemporalPlanner
     private static final String VALID_DATE_TIME_THRU_NAME = "legend_persistence_end_date";
     private static final String LEFT_DATASET_IN_JOIN_ALIAS = "legend_persistence_x";
     private static final String RIGHT_DATASET_IN_JOIN_ALIAS = "legend_persistence_y";
-    private static final String TEMP_DATASET_BASE_NAME = "legend_persistence_temp";
-    private static final String TEMP_DATASET_WITH_DELETE_INDICATOR_BASE_NAME = "legend_persistence_tempWithDeleteIndicator";
     private static final String STAGE_DATASET_WITHOUT_DUPLICATES_BASE_NAME = "legend_persistence_stageWithoutDuplicates";
 
     private final Optional<String> deleteIndicatorField;
@@ -94,6 +89,7 @@ class BitemporalDeltaPlanner extends BitemporalPlanner
     private Dataset stagingDataset;
     private Dataset tempDataset;
     private Dataset tempDatasetWithDeleteIndicator;
+    private Optional<Dataset> stagingDatasetWithoutDuplicates;
 
     private FieldValue sourceValidDatetimeFrom;
     private FieldValue targetValidDatetimeFrom;
@@ -116,6 +112,7 @@ class BitemporalDeltaPlanner extends BitemporalPlanner
         if (ingestMode().validityMilestoning().validityDerivation() instanceof SourceSpecifiesFromDateTime && ingestMode().deduplicationStrategy() instanceof FilterDuplicates)
         {
             this.stagingDataset = getStagingDatasetWithoutDuplicates(datasets);
+            this.stagingDatasetWithoutDuplicates = Optional.of(this.stagingDataset);
         }
         else
         {
@@ -177,55 +174,24 @@ class BitemporalDeltaPlanner extends BitemporalPlanner
 
         if (ingestMode().validityMilestoning().validityDerivation() instanceof SourceSpecifiesFromDateTime)
         {
-            this.tempDataset = getTempDataset(datasets);
+            this.tempDataset = LogicalPlanUtils.getTempDataset(datasets);
             if (deleteIndicatorField.isPresent())
             {
-                this.tempDatasetWithDeleteIndicator = getTempDatasetWithDeleteIndicator(datasets);
+                this.tempDatasetWithDeleteIndicator = LogicalPlanUtils.getTempDatasetWithDeleteIndicator(datasets, deleteIndicatorField.get());
             }
         }
     }
 
     private Dataset getStagingDatasetWithoutDuplicates(Datasets datasets)
     {
+        String tableName = stagingDataset().datasetReference().name().orElseThrow((IllegalStateException::new));
         return datasets.stagingDatasetWithoutDuplicates().orElse(DatasetDefinition.builder()
             .schema(stagingDataset().schema())
             .database(stagingDataset().datasetReference().database())
             .group(stagingDataset().datasetReference().group())
-            .name(LogicalPlanUtils.generateTableNameWithSuffix(stagingDataset().datasetReference().name().orElseThrow((IllegalStateException::new)), STAGE_DATASET_WITHOUT_DUPLICATES_BASE_NAME))
+            .name(tableName + UNDERSCORE + STAGE_DATASET_WITHOUT_DUPLICATES_BASE_NAME)
             .alias(STAGE_DATASET_WITHOUT_DUPLICATES_BASE_NAME)
             .build());
-    }
-
-    private Dataset getTempDataset(Datasets datasets)
-    {
-        return datasets.tempDataset().orElse(DatasetDefinition.builder()
-            .schema(mainDataset().schema())
-            .database(mainDataset().datasetReference().database())
-            .group(mainDataset().datasetReference().group())
-            .name(LogicalPlanUtils.generateTableNameWithSuffix(mainDataset().datasetReference().name().orElseThrow((IllegalStateException::new)), TEMP_DATASET_BASE_NAME))
-            .alias(TEMP_DATASET_BASE_NAME)
-            .build());
-    }
-
-    private Dataset getTempDatasetWithDeleteIndicator(Datasets datasets)
-    {
-        if (datasets.tempDatasetWithDeleteIndicator().isPresent())
-        {
-            return datasets.tempDatasetWithDeleteIndicator().get();
-        }
-        else
-        {
-            Field deleteIndicator = Field.builder().name(deleteIndicatorField.orElseThrow((IllegalStateException::new))).type(FieldType.of(DataType.BOOLEAN, Optional.empty(), Optional.empty())).build();
-            List<Field> mainFieldsPlusDeleteIndicator = new ArrayList<>(mainDataset().schema().fields());
-            mainFieldsPlusDeleteIndicator.add(deleteIndicator);
-            return DatasetDefinition.builder()
-                .schema(mainDataset().schema().withFields(mainFieldsPlusDeleteIndicator))
-                .database(mainDataset().datasetReference().database())
-                .group(mainDataset().datasetReference().group())
-                .name(LogicalPlanUtils.generateTableNameWithSuffix(mainDataset().datasetReference().name().orElseThrow((IllegalStateException::new)), TEMP_DATASET_WITH_DELETE_INDICATOR_BASE_NAME))
-                .alias(TEMP_DATASET_WITH_DELETE_INDICATOR_BASE_NAME)
-                .build();
-        }
     }
 
     @Override
@@ -308,6 +274,10 @@ class BitemporalDeltaPlanner extends BitemporalPlanner
                 operations.add(Create.of(true, stagingDataset));
             }
         }
+        if (options().enableConcurrentSafety())
+        {
+            operations.add(Create.of(true, lockInfoDataset().orElseThrow(IllegalStateException::new).get()));
+        }
 
         return LogicalPlan.of(operations);
     }
@@ -366,6 +336,24 @@ class BitemporalDeltaPlanner extends BitemporalPlanner
     {
         Dataset sink2 = getMainDatasetWithProvidedAlias("sink2");
         return getRowsUpdated(alias, getPrimaryKeyFieldsAndFromFieldFromMain(), sink2);
+    }
+
+    public LogicalPlan buildLogicalPlanForPostCleanup(Resources resources)
+    {
+        List<Operation> operations = new ArrayList<>();
+        if (ingestMode().validityMilestoning().validityDerivation() instanceof SourceSpecifiesFromDateTime)
+        {
+            operations.add(Drop.of(true, tempDataset, true));
+            if (deleteIndicatorField.isPresent())
+            {
+                operations.add(Drop.of(true, tempDatasetWithDeleteIndicator, true));
+            }
+            if (ingestMode().deduplicationStrategy() instanceof FilterDuplicates)
+            {
+                operations.add(Drop.of(true, stagingDatasetWithoutDuplicates.orElseThrow(IllegalStateException::new), true));
+            }
+        }
+        return LogicalPlan.of(operations);
     }
 
     public Optional<Condition> getDataSplitInRangeConditionForStatistics()

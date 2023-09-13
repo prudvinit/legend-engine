@@ -15,6 +15,8 @@
 
 package org.finos.legend.engine.query.sql.api.execute;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.dropwizard.testing.junit.ResourceTestRule;
 import org.eclipse.collections.api.factory.Lists;
 import org.eclipse.collections.api.list.MutableList;
@@ -22,13 +24,18 @@ import org.eclipse.collections.api.tuple.Pair;
 import org.eclipse.collections.impl.list.mutable.FastList;
 import org.eclipse.collections.impl.tuple.Tuples;
 import org.finos.legend.engine.language.pure.compiler.toPureGraph.PureModel;
+import org.finos.legend.engine.language.pure.grammar.to.DEPRECATED_PureGrammarComposerCore;
 import org.finos.legend.engine.language.pure.modelManager.ModelManager;
 import org.finos.legend.engine.plan.execution.PlanExecutor;
+import org.finos.legend.engine.plan.execution.result.serialization.SerializationFormat;
 import org.finos.legend.engine.plan.generation.extension.PlanGeneratorExtension;
 import org.finos.legend.engine.protocol.pure.PureClientVersions;
+import org.finos.legend.engine.pure.code.core.PureCoreExtensionLoader;
+import org.finos.legend.engine.protocol.pure.v1.model.valueSpecification.raw.Lambda;
 import org.finos.legend.engine.query.sql.api.CatchAllExceptionMapper;
 import org.finos.legend.engine.query.sql.api.MockPac4jFeature;
 import org.finos.legend.engine.query.sql.api.sources.TestSQLSourceProvider;
+import org.finos.legend.engine.shared.core.api.grammar.RenderStyle;
 import org.finos.legend.engine.shared.core.deployment.DeploymentMode;
 import org.finos.legend.pure.generated.Root_meta_external_query_sql_Enum;
 import org.finos.legend.pure.generated.Root_meta_external_query_sql_EnumValueSchemaColumn_Impl;
@@ -51,7 +58,7 @@ public class SqlExecuteTest
     @ClassRule
     public static final ResourceTestRule resources;
     private static final PureModel pureModel;
-
+    private static final ObjectMapper OM = new ObjectMapper();
 
     static
     {
@@ -69,7 +76,7 @@ public class SqlExecuteTest
 
         MutableList<PlanGeneratorExtension> generatorExtensions = Lists.mutable.withAll(ServiceLoader.load(PlanGeneratorExtension.class));
         TestSQLSourceProvider testSQLSourceProvider = new TestSQLSourceProvider();
-        SqlExecute sqlExecute = new SqlExecute(modelManager, executor, (pm) -> generatorExtensions.flatCollect(g -> g.getExtraExtensions(pm)), FastList.newListWith(testSQLSourceProvider), generatorExtensions.flatCollect(PlanGeneratorExtension::getExtraPlanTransformers));
+        SqlExecute sqlExecute = new SqlExecute(modelManager, executor, (pm) -> PureCoreExtensionLoader.extensions().flatCollect(g -> g.extraPureCoreExtensions(pm.getExecutionSupport())), FastList.newListWith(testSQLSourceProvider), generatorExtensions.flatCollect(PlanGeneratorExtension::getExtraPlanTransformers));
 
         PureModel pureModel = modelManager.loadModel(testSQLSourceProvider.getPureModelContextData(), PureClientVersions.production, null, "");
         ResourceTestRule resources = ResourceTestRule.builder()
@@ -83,6 +90,117 @@ public class SqlExecuteTest
     }
 
     @Test
+    public void testLambda() throws JsonProcessingException
+    {
+        String lambda = resources.target("sql/v1/execution/generateLambdaString")
+                .request()
+                .post(Entity.text("SELECT Name FROM service('/personServiceForNames')")).readEntity(String.class);
+
+        String expectedCode = "names: String[*]|demo::employee.all()->filter(\n" +
+                "  p: demo::employee[1]|$names->isEmpty() ||\n" +
+                "    $p.name->in(\n" +
+                "    $names\n" +
+                "  )\n" +
+                ")->project(\n" +
+                "  [\n" +
+                "    x: demo::employee[1]|$x.id,\n" +
+                "    x: demo::employee[1]|$x.name,\n" +
+                "    x: demo::employee[1]|$x.type\n" +
+                "  ],\n" +
+                "  [\n" +
+                "    'Id',\n" +
+                "    'Name',\n" +
+                "    'Employee Type'\n" +
+                "  ]\n" +
+                ")->restrict('Name')";
+
+        Lambda actual = new ObjectMapper().readValue(lambda, Lambda.class);
+        String actualGrammar = actual.accept(DEPRECATED_PureGrammarComposerCore.Builder.newInstance().withRenderStyle(RenderStyle.PRETTY).build());
+
+        Assert.assertEquals(expectedCode, actualGrammar);
+    }
+
+    @Test
+    public void testExecuteWithParameters() throws JsonProcessingException
+    {
+        String all = resources.target("sql/v1/execution/executeQueryString")
+                .request()
+                .post(Entity.text("SELECT Name FROM service('/personServiceForNames') ORDER BY Name")).readEntity(String.class);
+
+        String filtered = resources.target("sql/v1/execution/executeQueryString")
+                .request()
+                .post(Entity.text("SELECT Name FROM service('/personServiceForNames', names => ['Alice', 'Danielle']) ORDER BY Name")).readEntity(String.class);
+
+        TDSExecuteResult allExpected = TDSExecuteResult.builder(FastList.newListWith("Name"))
+                .addRow(FastList.newListWith("Alice"))
+                .addRow(FastList.newListWith("Bob"))
+                .addRow(FastList.newListWith("Curtis"))
+                .addRow(FastList.newListWith("Danielle"))
+                .build();
+
+        TDSExecuteResult filteredExpected = TDSExecuteResult.builder(FastList.newListWith("Name"))
+                .addRow(FastList.newListWith("Alice"))
+                .addRow(FastList.newListWith("Danielle"))
+                .build();
+
+        Assert.assertEquals(allExpected, OM.readValue(all, TDSExecuteResult.class));
+        Assert.assertEquals(filteredExpected, OM.readValue(filtered, TDSExecuteResult.class));
+    }
+
+    @Test
+    public void testExecuteWithDateParams() throws JsonProcessingException
+    {
+        String all = resources.target("sql/v1/execution/executeQueryString")
+                .request()
+                .post(Entity.text("SELECT Name FROM service('/personServiceForStartDate/{date}', date =>'2023-08-24')")).readEntity(String.class);
+
+        TDSExecuteResult allExpected = TDSExecuteResult.builder(FastList.newListWith("Name"))
+                .addRow(FastList.newListWith("Alice"))
+                .build();
+
+        Assert.assertEquals(allExpected, OM.readValue(all, TDSExecuteResult.class));
+    }
+
+    @Test
+    public void testExecuteWithEnumParams() throws JsonProcessingException
+    {
+        String all = resources.target("sql/v1/execution/executeQueryString")
+                .request()
+                .post(Entity.text("SELECT Name FROM service('/personServiceForStartDate/{date}', date =>'2023-08-24', type => 'Type1')")).readEntity(String.class);
+
+        TDSExecuteResult allExpected = TDSExecuteResult.builder(FastList.newListWith("Name"))
+                .addRow(FastList.newListWith("Alice"))
+                .build();
+
+        Assert.assertEquals(allExpected, OM.readValue(all, TDSExecuteResult.class));
+    }
+
+    @Test
+    public void testExecuteWithExpressionParams() throws JsonProcessingException
+    {
+        String all = resources.target("sql/v1/execution/executeQueryString")
+                .request()
+                .post(Entity.text("SELECT Name FROM service('/personServiceForStartDate/{date}', date => cast('2023-08-24' as DATE))")).readEntity(String.class);
+
+        TDSExecuteResult allExpected = TDSExecuteResult.builder(FastList.newListWith("Name"))
+                .addRow(FastList.newListWith("Alice"))
+                .build();
+
+        Assert.assertEquals(allExpected, OM.readValue(all, TDSExecuteResult.class));
+    }
+
+    @Test
+    public void testExecuteWithCSVFormat()
+    {
+        String results = resources.target("sql/v1/execution/executeQueryString")
+                .queryParam("serializationFormat", SerializationFormat.CSV)
+                .request()
+                .post(Entity.text("SELECT Name FROM service('/personServiceForNames') ORDER BY Name")).readEntity(String.class);
+
+        Assert.assertEquals("Name\r\nAlice\r\nBob\r\nCurtis\r\nDanielle\r\n", results);
+    }
+
+    @Test
     public void getSchemaForQueryWithDuplicateSources()
     {
         String actualSchema = resources.target("sql/v1/execution/getSchemaFromQueryString")
@@ -92,7 +210,7 @@ public class SqlExecuteTest
         org.finos.legend.pure.m3.coreinstance.meta.pure.metamodel.type.Enum integerType = new Root_meta_pure_metamodel_type_Enum_Impl("Integer");
         Root_meta_external_query_sql_SchemaColumn idColumn = new Root_meta_external_query_sql_PrimitiveValueSchemaColumn_Impl((String) null)._name("Id")._type(integerType);
         Root_meta_external_query_sql_Schema schema = new Root_meta_external_query_sql_Schema_Impl((String) null)._columnsAdd(idColumn);
-        String expectedSchema = SqlExecute.serializeToJSON(schema, pureModel);
+        String expectedSchema = SqlExecute.serializeToJSON(schema, pureModel, false);
         Assert.assertEquals(expectedSchema, actualSchema);
     }
 
@@ -110,7 +228,7 @@ public class SqlExecuteTest
         Root_meta_external_query_sql_SchemaColumn typeColumn = new Root_meta_external_query_sql_EnumValueSchemaColumn_Impl((String) null)._name("Employee Type")._type("demo::employeeType");
         Root_meta_external_query_sql_Enum employeeType = new Root_meta_external_query_sql_Enum_Impl((String) null)._type("demo::employeeType")._valuesAdd("Type1")._valuesAdd("Type2");
         Root_meta_external_query_sql_Schema schema = new Root_meta_external_query_sql_Schema_Impl((String) null)._columnsAdd(idColumn)._columnsAdd(nameColumn)._columnsAdd(typeColumn)._enumsAdd(employeeType);
-        String expectedSchema = SqlExecute.serializeToJSON(schema, pureModel);
+        String expectedSchema = SqlExecute.serializeToJSON(schema, pureModel, false);
         Assert.assertEquals(expectedSchema, actualSchema);
     }
 
@@ -127,7 +245,7 @@ public class SqlExecuteTest
         Root_meta_external_query_sql_SchemaColumn typeColumn = new Root_meta_external_query_sql_EnumValueSchemaColumn_Impl((String) null)._name("Employee Type")._type("demo::employeeType");
         Root_meta_external_query_sql_Enum employeeType = new Root_meta_external_query_sql_Enum_Impl((String) null)._type("demo::employeeType")._valuesAdd("Type1")._valuesAdd("Type2");
         Root_meta_external_query_sql_Schema schema = new Root_meta_external_query_sql_Schema_Impl((String) null)._columnsAdd(idColumn)._columnsAdd(nameColumn)._columnsAdd(typeColumn)._enumsAdd(employeeType);
-        String expectedSchema = SqlExecute.serializeToJSON(schema, pureModel);
+        String expectedSchema = SqlExecute.serializeToJSON(schema, pureModel, false);
         Assert.assertEquals(expectedSchema, actualSchema);
     }
 

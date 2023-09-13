@@ -12,13 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import meta::external::shared::format::executionPlan::platformBinding::legendJava::*;
+import meta::external::format::shared::executionPlan::platformBinding::legendJava::*;
 
 import meta::external::format::flatdata::contract::*;
 import meta::external::format::flatdata::executionPlan::*;
 import meta::external::format::flatdata::executionPlan::platformBinding::legendJava::*;
 import meta::external::format::flatdata::executionPlan::platformBinding::legendJava::externalize::*;
 import meta::external::format::flatdata::executionPlan::platformBinding::legendJava::internalize::*;
+
 
 function meta::external::format::flatdata::executionPlan::platformBinding::legendJava::flatDataJavaBindingDescriptor():ExternalFormatLegendJavaPlatformBindingDescriptor[1]
 {
@@ -29,4 +30,17 @@ function meta::external::format::flatdata::executionPlan::platformBinding::legen
     externalizeDescriptor      = getExternalFormatExternalizeJavaBindingDescriptor(),
     internalizeDescriptor      = getExternalFormatInternalizeJavaBindingDescriptor()
   )
+}
+
+
+function meta::external::format::flatdata::executionPlan::platformBinding::legendJava::flatDataExtensionJavaPlatformBinding(): meta::pure::extension::Extension[1]
+{
+  meta::pure::executionPlan::platformBinding::platformBindingExtension('PlatformBinding - LegendJava - ExternalFormatFlatData', [
+    meta::pure::executionPlan::platformBinding::legendJava::legendJavaPlatformBinding([
+      // Bindings
+      meta::external::format::shared::executionPlan::platformBinding::legendJava::externalFormatLegendJavaPlatformBindingExtension([
+        meta::external::format::flatdata::executionPlan::platformBinding::legendJava::flatDataJavaBindingDescriptor()
+      ])
+    ])
+  ])
 }

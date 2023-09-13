@@ -63,12 +63,12 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.Comparator;
 import java.util.stream.Collectors;
 
 public class BigQueryEndToEndTest
@@ -134,7 +134,7 @@ public class BigQueryEndToEndTest
             .build();
 
     protected IngestorResult ingestViaExecutorAndVerifyStagingFilters(IngestMode ingestMode, SchemaDefinition stagingSchema,
-                                                                      DatasetFilter stagingFilter, String path, Clock clock, boolean VerifyStagingFilters) throws IOException, InterruptedException
+            DatasetFilter stagingFilter, String path, Clock clock, boolean VerifyStagingFilters) throws IOException, InterruptedException
     {
         RelationalIngestor ingestor = RelationalIngestor.builder()
                 .ingestMode(ingestMode)
@@ -156,7 +156,7 @@ public class BigQueryEndToEndTest
         // Load csv data
         loadData(path, datasets.stagingDataset(), 1);
         RelationalConnection connection = BigQueryConnection.of(getBigQueryConnection());
-        IngestorResult ingestorResult = ingestor.ingest(connection, datasets);
+        IngestorResult ingestorResult = ingestor.performFullIngestion(connection, datasets);
 
         verifyStagingFilters(ingestor, connection, datasets);
         return ingestorResult;
@@ -383,7 +383,7 @@ public class BigQueryEndToEndTest
                 .caseConversion(CaseConversion.TO_UPPER)
                 .build();
 
-        IngestorResult result = ingestor.ingest(BigQueryConnection.of(getBigQueryConnection()), datasets);
+        IngestorResult result = ingestor.performFullIngestion(BigQueryConnection.of(getBigQueryConnection()), datasets);
 
         Map<StatisticName, Object> actualStats = result.statisticByName();
 
@@ -430,7 +430,7 @@ public class BigQueryEndToEndTest
                 .enableSchemaEvolution(options.enableSchemaEvolution())
                 .schemaEvolutionCapabilitySet(userCapabilitySet)
                 .build();
-        IngestorResult result = ingestor.ingest(BigQueryConnection.of(getBigQueryConnection()), datasets);
+        IngestorResult result = ingestor.performFullIngestion(BigQueryConnection.of(getBigQueryConnection()), datasets);
 
         Map<StatisticName, Object> actualStats = result.statisticByName();
 

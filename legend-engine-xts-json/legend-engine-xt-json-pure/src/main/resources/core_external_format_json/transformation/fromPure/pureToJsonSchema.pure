@@ -15,17 +15,17 @@
 import meta::external::format::json::metamodel::*;
 import meta::external::format::json::transformation::fromPure::*;
 
-import meta::external::shared::format::*;
-import meta::external::shared::format::metamodel::*;
-import meta::external::shared::format::utils::*;
+import meta::external::format::shared::*;
+import meta::external::format::shared::metamodel::*;
+import meta::external::format::shared::utils::*;
 
 import meta::pure::generation::metamodel::*;
 
 import meta::pure::model::unit::*;
 
 // To be removed
-import meta::json::schema::fromSchema::*;
-import meta::json::schema::generation::*;
+import meta::external::format::json::schema::fromSchema::*;
+import meta::external::format::json::schema::generation::*;
 // To be removed
 
 // ========================================================================================================================================================
@@ -47,7 +47,7 @@ function meta::external::format::json::transformation::fromPure::jsonSchemaFromP
 // Configuration
 // ========================================================================================================================================================
 
-Class meta::external::format::json::transformation::fromPure::ModelToJsonSchemaConfiguration extends meta::external::shared::format::transformation::fromPure::ModelToSchemaConfiguration
+Class meta::external::format::json::transformation::fromPure::ModelToJsonSchemaConfiguration extends meta::external::format::shared::transformation::fromPure::ModelToSchemaConfiguration
 {
 }
 

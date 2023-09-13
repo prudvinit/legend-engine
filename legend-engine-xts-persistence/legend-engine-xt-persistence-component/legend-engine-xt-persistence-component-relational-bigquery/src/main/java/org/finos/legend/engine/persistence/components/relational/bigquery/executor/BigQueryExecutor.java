@@ -15,6 +15,7 @@
 package org.finos.legend.engine.persistence.components.relational.bigquery.executor;
 
 import org.finos.legend.engine.persistence.components.executor.Executor;
+import org.finos.legend.engine.persistence.components.executor.RelationalExecutionHelper;
 import org.finos.legend.engine.persistence.components.logicalplan.datasets.Dataset;
 import org.finos.legend.engine.persistence.components.relational.SqlPlan;
 import org.finos.legend.engine.persistence.components.relational.bigquery.BigQuerySink;
@@ -104,9 +105,9 @@ public class BigQueryExecutor implements Executor<SqlGen, TabularData, SqlPlan>
     }
 
     @Override
-    public Dataset constructDatasetFromDatabase(String tableName, String schemaName, String databaseName)
+    public Dataset constructDatasetFromDatabase(Dataset dataset)
     {
-        return bigQuerySink.constructDatasetFromDatabaseFn().execute(this, bigQueryHelper, tableName, schemaName, databaseName);
+        return bigQuerySink.constructDatasetFromDatabaseFn().execute(this, bigQueryHelper, dataset);
     }
 
     @Override
@@ -131,6 +132,12 @@ public class BigQueryExecutor implements Executor<SqlGen, TabularData, SqlPlan>
     public void close()
     {
         bigQueryHelper.close();
+    }
+
+    @Override
+    public RelationalExecutionHelper getRelationalExecutionHelper()
+    {
+        return this.bigQueryHelper;
     }
 
     private String getEnrichedSql(Map<String, String> placeholderKeyValues, String sql)

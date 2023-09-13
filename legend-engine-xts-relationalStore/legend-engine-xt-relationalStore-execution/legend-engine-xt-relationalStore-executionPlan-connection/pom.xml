@@ -19,7 +19,7 @@
     <parent>
         <groupId>org.finos.legend.engine</groupId>
         <artifactId>legend-engine-xt-relationalStore-execution</artifactId>
-        <version>4.18.3-SNAPSHOT</version>
+        <version>4.27.2-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
@@ -180,14 +180,6 @@
         </dependency>
         <!-- ECLIPSE COLLECTIONS -->
 
-        <!-- Guava -->
-        <dependency>
-            <groupId>com.google.guava</groupId>
-            <artifactId>guava</artifactId>
-        </dependency>
-        <!-- Guava -->
-
-
         <!-- POOLING -->
         <dependency>
             <groupId>com.zaxxer</groupId>
@@ -202,14 +194,18 @@
         </dependency>
         <!-- METRICS -->
 
+        <!-- PROMETHEUS -->
+        <dependency>
+            <groupId>io.prometheus</groupId>
+            <artifactId>simpleclient</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- PROMETHEUS -->
+
         <!-- DRIVERS -->
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>net.snowflake</groupId>
-            <artifactId>snowflake-jdbc</artifactId>
         </dependency>
         <dependency>
             <groupId>com.databricks</groupId>
@@ -219,11 +215,6 @@
         <dependency>
             <groupId>com.microsoft.sqlserver</groupId>
             <artifactId>mssql-jdbc</artifactId>
-            <scope>runtime</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.amazon.redshift</groupId>
-            <artifactId>redshift-jdbc42</artifactId>
             <scope>runtime</scope>
         </dependency>
         <dependency>

@@ -217,6 +217,16 @@ function <<access.private>> meta::relational::functions::typeInference::getDynaF
       ),
 
       pair(
+         'ascii',
+         list([
+            pair(
+               {params: RelationalOperationElement[*] | true},
+               {params: RelationalOperationElement[*] | ^meta::relational::metamodel::datatype::Integer()}
+            )
+         ])
+      ),       
+
+      pair(
          'asin',
          list([
             pair(
@@ -281,6 +291,16 @@ function <<access.private>> meta::relational::functions::typeInference::getDynaF
       ),
 
       pair(
+         'cbrt',
+         list([
+            pair(
+               {params: RelationalOperationElement[*] | true},
+               {params: RelationalOperationElement[*] | ^meta::relational::metamodel::datatype::Double()}
+            )
+         ])
+      ),
+
+      pair(
          'ceiling',
          list([
             pair(
@@ -297,6 +317,16 @@ function <<access.private>> meta::relational::functions::typeInference::getDynaF
             )
          ])
       ),
+
+      pair(
+         'char',
+         list([
+            pair(
+               {params: RelationalOperationElement[*] | true},
+               {params: RelationalOperationElement[*] | ^meta::relational::metamodel::datatype::Varchar(size = 1)}
+            )
+         ])
+      ),       
 
       pair(
          'coalesce',
@@ -369,6 +399,16 @@ function <<access.private>> meta::relational::functions::typeInference::getDynaF
       ),
 
       pair(
+         'cot',
+         list([
+            pair(
+               {params: RelationalOperationElement[*] | true},
+               {params: RelationalOperationElement[*] | ^meta::relational::metamodel::datatype::Double()}
+            )
+         ])
+      ),      
+
+      pair(
          'count',
          list([
             pair(
@@ -410,6 +450,16 @@ function <<access.private>> meta::relational::functions::typeInference::getDynaF
 
       pair(
          'dayOfWeekNumber',
+         list([
+            pair(
+               {params: RelationalOperationElement[*] | true},
+               {params: RelationalOperationElement[*] | ^meta::relational::metamodel::datatype::Integer()}
+            )
+         ])
+      ),
+
+      pair(
+         'dayOfYear',
          list([
             pair(
                {params: RelationalOperationElement[*] | true},
@@ -557,6 +607,46 @@ function <<access.private>> meta::relational::functions::typeInference::getDynaF
             )
          ])
       ),
+
+      pair(
+         'firstHourOfDay',
+         list([
+            pair(
+               {params: RelationalOperationElement[*] | true},
+               {params: RelationalOperationElement[*] | ^meta::relational::metamodel::datatype::Timestamp()}
+            )
+         ])
+      ),      
+
+      pair(
+         'firstMinuteOfHour',
+         list([
+            pair(
+               {params: RelationalOperationElement[*] | true},
+               {params: RelationalOperationElement[*] | ^meta::relational::metamodel::datatype::Timestamp()}
+            )
+         ])
+      ),         
+
+      pair(
+         'firstSecondOfMinute',
+         list([
+            pair(
+               {params: RelationalOperationElement[*] | true},
+               {params: RelationalOperationElement[*] | ^meta::relational::metamodel::datatype::Timestamp()}
+            )
+         ])
+      ),   
+
+      pair(
+         'firstMillisecondOfSecond',
+         list([
+            pair(
+               {params: RelationalOperationElement[*] | true},
+               {params: RelationalOperationElement[*] | ^meta::relational::metamodel::datatype::Timestamp()}
+            )
+         ])
+      ),         
 
       pair(
          'floor',
@@ -757,6 +847,16 @@ function <<access.private>> meta::relational::functions::typeInference::getDynaF
       ),
 
       pair(
+         'log10',
+         list([
+            pair(
+               {params: RelationalOperationElement[*] | true},
+               {params: RelationalOperationElement[*] | ^meta::relational::metamodel::datatype::Double()}
+            )
+         ])
+      ),      
+
+      pair(
          'ltrim',
          list([
             pair(
@@ -779,6 +879,16 @@ function <<access.private>> meta::relational::functions::typeInference::getDynaF
             )
          ])
       ),
+
+      pair(
+         'md5',
+         list([
+            pair(
+               {params: RelationalOperationElement[*] | true},
+               {params: RelationalOperationElement[*] | ^meta::relational::metamodel::datatype::Varchar(size = 32)}
+            )
+         ])
+      ),      
 
       pair(
          'min',
@@ -1025,6 +1135,16 @@ function <<access.private>> meta::relational::functions::typeInference::getDynaF
       ),
 
       pair(
+         'reverse',
+         list([
+            pair(
+               {params: RelationalOperationElement[*] | true},
+               {params: RelationalOperationElement[*] | $params->at(0)->inferRelationalType()}
+            )
+         ])
+      ),      
+
+      pair(
          'right',
          list([
             pair(
@@ -1081,6 +1201,36 @@ function <<access.private>> meta::relational::functions::typeInference::getDynaF
             )
          ])
       ),
+
+      pair(
+         'sha1',
+         list([
+            pair(
+               {params: RelationalOperationElement[*] | true},
+               {params: RelationalOperationElement[*] | ^meta::relational::metamodel::datatype::Varchar(size = 40)}
+            )
+         ])
+      ),          
+
+      pair(
+         'sha256',
+         list([
+            pair(
+               {params: RelationalOperationElement[*] | true},
+               {params: RelationalOperationElement[*] | ^meta::relational::metamodel::datatype::Varchar(size = 64)}
+            )
+         ])
+      ),        
+
+      pair(
+         'sign',
+         list([
+            pair(
+               {params: RelationalOperationElement[*] | true},
+               {params: RelationalOperationElement[*] | ^meta::relational::metamodel::datatype::Integer()}
+            )
+         ])
+      ),      
 
       pair(
          'sin',
@@ -1294,6 +1444,26 @@ function <<access.private>> meta::relational::functions::typeInference::getDynaF
             pair(
                {params: RelationalOperationElement[*] | true},
                {params: RelationalOperationElement[*] | ^meta::relational::metamodel::datatype::Varchar(size = $params->at(0)->inferRelationalType()->match([c:meta::relational::metamodel::datatype::Char[1]|$c.size,c:meta::relational::metamodel::datatype::Varchar[1]|$c.size]))}
+            )
+         ])
+      ),
+
+      pair(
+         'variancePopulation',
+         list([
+            pair(
+               {params: RelationalOperationElement[*] | true},
+               {params: RelationalOperationElement[*] | ^meta::relational::metamodel::datatype::Double()}
+            )
+         ])
+      ),
+
+      pair(
+         'varianceSample',
+         list([
+            pair(
+               {params: RelationalOperationElement[*] | true},
+               {params: RelationalOperationElement[*] | ^meta::relational::metamodel::datatype::Double()}
             )
          ])
       ),

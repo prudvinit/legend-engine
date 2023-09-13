@@ -57,7 +57,8 @@ public class DeriveMainDatasetSchemaFromStaging implements IngestModeVisitor<Dat
                 .name(mainDataset.datasetReference().name().get())
                 .database(mainDataset.datasetReference().database())
                 .group(mainDataset.datasetReference().group())
-                .alias(mainDataset.datasetReference().alias().orElse(null));
+                .alias(mainDataset.datasetReference().alias().orElse(null))
+                .datasetAdditionalProperties(mainDataset.datasetAdditionalProperties());
 
         this.mainSchemaDefinitionBuilder = SchemaDefinition.builder()
                 .addAllIndexes(mainDataset.schema().indexes())
@@ -135,6 +136,26 @@ public class DeriveMainDatasetSchemaFromStaging implements IngestModeVisitor<Dat
         bitemporalDelta.mergeStrategy().accept(new EnrichSchemaWithMergeStrategy(mainSchemaFields));
         bitemporalDelta.transactionMilestoning().accept(new EnrichSchemaWithTransactionMilestoning(mainSchemaFields));
         bitemporalDelta.validityMilestoning().accept(new EnrichSchemaWithValidityMilestoning(mainSchemaFields));
+        return mainDatasetDefinitionBuilder.schema(mainSchemaDefinitionBuilder.addAllFields(mainSchemaFields).build()).build();
+    }
+
+    @Override
+    public Dataset visitBulkLoad(BulkLoadAbstract bulkLoad)
+    {
+        if (bulkLoad.generateDigest())
+        {
+            addDigestField(mainSchemaFields, bulkLoad.digestField().get());
+        }
+        bulkLoad.auditing().accept(new EnrichSchemaWithAuditing(mainSchemaFields, false));
+        if (bulkLoad.lineageField().isPresent())
+        {
+            Field lineageField = Field.builder()
+                    .name(bulkLoad.lineageField().get())
+                    .type(FieldType.of(DataType.VARCHAR, Optional.empty(), Optional.empty()))
+                    .primaryKey(false)
+                    .build();
+            mainSchemaFields.add(lineageField);
+        }
         return mainDatasetDefinitionBuilder.schema(mainSchemaDefinitionBuilder.addAllFields(mainSchemaFields).build()).build();
     }
 
@@ -302,9 +323,9 @@ public class DeriveMainDatasetSchemaFromStaging implements IngestModeVisitor<Dat
         {
             Field dateTimeFrom = getBatchTimeField(validDateTime.dateTimeFromName(), true);
             Field dateTimeThru = getBatchTimeField(validDateTime.dateTimeThruName(), false);
+            validDateTime.validityDerivation().accept(new EnrichSchemaWithValidityMilestoningDerivation(mainSchemaFields));
             mainSchemaFields.add(dateTimeFrom);
             mainSchemaFields.add(dateTimeThru);
-            validDateTime.validityDerivation().accept(new EnrichSchemaWithValidityMilestoningDerivation(mainSchemaFields));
             return null;
         }
     }

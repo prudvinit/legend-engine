@@ -27,23 +27,25 @@ import org.finos.legend.engine.persistence.components.logicalplan.operations.Del
 import org.finos.legend.engine.persistence.components.logicalplan.operations.Truncate;
 import org.finos.legend.engine.persistence.components.logicalplan.values.BatchEndTimestamp;
 import org.finos.legend.engine.persistence.components.logicalplan.values.BatchStartTimestamp;
+import org.finos.legend.engine.persistence.components.logicalplan.values.DatetimeValue;
 import org.finos.legend.engine.persistence.components.optimizer.Optimizer;
 import org.finos.legend.engine.persistence.components.relational.CaseConversion;
 import org.finos.legend.engine.persistence.components.relational.RelationalSink;
 import org.finos.legend.engine.persistence.components.relational.SqlPlan;
 import org.finos.legend.engine.persistence.components.relational.ansi.AnsiSqlSink;
+import org.finos.legend.engine.persistence.components.relational.ansi.optimizer.LowerCaseOptimizer;
+import org.finos.legend.engine.persistence.components.relational.ansi.optimizer.UpperCaseOptimizer;
 import org.finos.legend.engine.persistence.components.relational.api.RelationalConnection;
 import org.finos.legend.engine.persistence.components.relational.bigquery.executor.BigQueryConnection;
 import org.finos.legend.engine.persistence.components.relational.bigquery.executor.BigQueryExecutor;
 import org.finos.legend.engine.persistence.components.relational.bigquery.executor.BigQueryHelper;
-import org.finos.legend.engine.persistence.components.relational.ansi.optimizer.LowerCaseOptimizer;
-import org.finos.legend.engine.persistence.components.relational.ansi.optimizer.UpperCaseOptimizer;
 import org.finos.legend.engine.persistence.components.relational.bigquery.sql.BigQueryDataTypeMapping;
 import org.finos.legend.engine.persistence.components.relational.bigquery.sql.BigQueryDataTypeToLogicalDataTypeMapping;
 import org.finos.legend.engine.persistence.components.relational.bigquery.sql.visitor.AlterVisitor;
 import org.finos.legend.engine.persistence.components.relational.bigquery.sql.visitor.BatchEndTimestampVisitor;
 import org.finos.legend.engine.persistence.components.relational.bigquery.sql.visitor.BatchStartTimestampVisitor;
 import org.finos.legend.engine.persistence.components.relational.bigquery.sql.visitor.ClusterKeyVisitor;
+import org.finos.legend.engine.persistence.components.relational.bigquery.sql.visitor.DatetimeValueVisitor;
 import org.finos.legend.engine.persistence.components.relational.bigquery.sql.visitor.DeleteVisitor;
 import org.finos.legend.engine.persistence.components.relational.bigquery.sql.visitor.FieldVisitor;
 import org.finos.legend.engine.persistence.components.relational.bigquery.sql.visitor.PartitionKeyVisitor;
@@ -92,28 +94,27 @@ public class BigQuerySink extends AnsiSqlSink
         logicalPlanVisitorByClass.put(Delete.class, new DeleteVisitor());
         logicalPlanVisitorByClass.put(Field.class, new FieldVisitor());
         logicalPlanVisitorByClass.put(Truncate.class, new TruncateVisitor());
+        logicalPlanVisitorByClass.put(DatetimeValue.class, new DatetimeValueVisitor());
         logicalPlanVisitorByClass.put(BatchEndTimestamp.class, new BatchEndTimestampVisitor());
         logicalPlanVisitorByClass.put(BatchStartTimestamp.class, new BatchStartTimestampVisitor());
         LOGICAL_PLAN_VISITOR_BY_CLASS = Collections.unmodifiableMap(logicalPlanVisitorByClass);
 
         Map<DataType, Set<DataType>> implicitDataTypeMapping = new HashMap<>();
-        implicitDataTypeMapping.put(DataType.INTEGER, getUnmodifiableDataTypesSet(DataType.INT, DataType.BIGINT, DataType.TINYINT, DataType.SMALLINT, DataType.INT64));
-        implicitDataTypeMapping.put(DataType.NUMERIC, getUnmodifiableDataTypesSet(DataType.NUMERIC, DataType.NUMBER, DataType.DECIMAL, DataType.INT, DataType.INTEGER, DataType.BIGINT, DataType.TINYINT, DataType.SMALLINT, DataType.INT64));
-        implicitDataTypeMapping.put(DataType.FLOAT, getUnmodifiableDataTypesSet(DataType.REAL, DataType.DOUBLE, DataType.FLOAT64, DataType.INT, DataType.INTEGER, DataType.BIGINT, DataType.TINYINT, DataType.SMALLINT, DataType.INT64, DataType.NUMBER, DataType.NUMERIC, DataType.DECIMAL));
-        implicitDataTypeMapping.put(DataType.STRING, getUnmodifiableDataTypesSet(DataType.STRING, DataType.CHAR, DataType.CHARACTER, DataType.VARCHAR, DataType.LONGNVARCHAR, DataType.LONGTEXT, DataType.TEXT));
+        implicitDataTypeMapping.put(DataType.INTEGER, getUnmodifiableDataTypesSet(DataType.INT, DataType.BIGINT, DataType.TINYINT, DataType.SMALLINT));
+        implicitDataTypeMapping.put(DataType.NUMERIC, getUnmodifiableDataTypesSet(DataType.NUMERIC, DataType.DECIMAL, DataType.INT, DataType.INTEGER, DataType.BIGINT, DataType.TINYINT, DataType.SMALLINT));
+        implicitDataTypeMapping.put(DataType.FLOAT, getUnmodifiableDataTypesSet(DataType.REAL, DataType.DOUBLE, DataType.INT, DataType.INTEGER, DataType.BIGINT, DataType.TINYINT, DataType.SMALLINT, DataType.NUMERIC, DataType.DECIMAL));
+        implicitDataTypeMapping.put(DataType.STRING, getUnmodifiableDataTypesSet(DataType.STRING, DataType.CHAR, DataType.VARCHAR, DataType.LONGTEXT, DataType.TEXT));
         implicitDataTypeMapping.put(DataType.DATETIME, Collections.singleton(DataType.DATE));
         IMPLICIT_DATA_TYPE_MAPPING = Collections.unmodifiableMap(implicitDataTypeMapping);
 
         Map<DataType, Set<DataType>> explicitDataTypeMapping = new HashMap<>();
-        explicitDataTypeMapping.put(DataType.INT, getUnmodifiableDataTypesSet(DataType.NUMBER, DataType.NUMERIC, DataType.DECIMAL, DataType.REAL, DataType.FLOAT, DataType.DOUBLE, DataType.FLOAT64));
-        explicitDataTypeMapping.put(DataType.INTEGER, getUnmodifiableDataTypesSet(DataType.NUMBER, DataType.NUMERIC, DataType.DECIMAL, DataType.REAL, DataType.FLOAT, DataType.DOUBLE, DataType.FLOAT64));
-        explicitDataTypeMapping.put(DataType.BIGINT, getUnmodifiableDataTypesSet(DataType.NUMBER, DataType.NUMERIC, DataType.DECIMAL, DataType.REAL, DataType.FLOAT, DataType.DOUBLE, DataType.FLOAT64));
-        explicitDataTypeMapping.put(DataType.TINYINT, getUnmodifiableDataTypesSet(DataType.NUMBER, DataType.NUMERIC, DataType.DECIMAL, DataType.REAL, DataType.FLOAT, DataType.DOUBLE, DataType.FLOAT64));
-        explicitDataTypeMapping.put(DataType.SMALLINT, getUnmodifiableDataTypesSet(DataType.NUMBER, DataType.NUMERIC, DataType.DECIMAL, DataType.REAL, DataType.FLOAT, DataType.DOUBLE, DataType.FLOAT64));
-        explicitDataTypeMapping.put(DataType.INT64, getUnmodifiableDataTypesSet(DataType.NUMBER, DataType.NUMERIC, DataType.DECIMAL, DataType.REAL, DataType.FLOAT, DataType.DOUBLE, DataType.FLOAT64));
-        explicitDataTypeMapping.put(DataType.NUMBER, getUnmodifiableDataTypesSet(DataType.REAL, DataType.FLOAT, DataType.DOUBLE, DataType.FLOAT64));
-        explicitDataTypeMapping.put(DataType.NUMERIC, getUnmodifiableDataTypesSet(DataType.REAL, DataType.FLOAT, DataType.DOUBLE, DataType.FLOAT64));
-        explicitDataTypeMapping.put(DataType.DECIMAL, getUnmodifiableDataTypesSet(DataType.REAL, DataType.FLOAT, DataType.DOUBLE, DataType.FLOAT64));
+        explicitDataTypeMapping.put(DataType.INT, getUnmodifiableDataTypesSet(DataType.NUMERIC, DataType.DECIMAL, DataType.REAL, DataType.FLOAT, DataType.DOUBLE));
+        explicitDataTypeMapping.put(DataType.INTEGER, getUnmodifiableDataTypesSet(DataType.NUMERIC, DataType.DECIMAL, DataType.REAL, DataType.FLOAT, DataType.DOUBLE));
+        explicitDataTypeMapping.put(DataType.BIGINT, getUnmodifiableDataTypesSet(DataType.NUMERIC, DataType.DECIMAL, DataType.REAL, DataType.FLOAT, DataType.DOUBLE));
+        explicitDataTypeMapping.put(DataType.TINYINT, getUnmodifiableDataTypesSet(DataType.NUMERIC, DataType.DECIMAL, DataType.REAL, DataType.FLOAT, DataType.DOUBLE));
+        explicitDataTypeMapping.put(DataType.SMALLINT, getUnmodifiableDataTypesSet(DataType.NUMERIC, DataType.DECIMAL, DataType.REAL, DataType.FLOAT, DataType.DOUBLE));
+        explicitDataTypeMapping.put(DataType.NUMERIC, getUnmodifiableDataTypesSet(DataType.REAL, DataType.FLOAT, DataType.DOUBLE));
+        explicitDataTypeMapping.put(DataType.DECIMAL, getUnmodifiableDataTypesSet(DataType.REAL, DataType.FLOAT, DataType.DOUBLE));
         EXPLICIT_DATA_TYPE_MAPPING = Collections.unmodifiableMap(explicitDataTypeMapping);
         INSTANCE = new BigQuerySink();
     }
@@ -138,7 +139,7 @@ public class BigQuerySink extends AnsiSqlSink
                 LOGICAL_PLAN_VISITOR_BY_CLASS,
                 (executor, sink, dataset) -> sink.doesTableExist(dataset),
                 (executor, sink, dataset) -> sink.validateDatasetSchema(dataset, new BigQueryDataTypeMapping()),
-                (executor, sink, tableName, schemaName, databaseName) -> sink.constructDatasetFromDatabase(tableName, schemaName, databaseName, new BigQueryDataTypeToLogicalDataTypeMapping()));
+                (executor, sink, dataset) -> sink.constructDatasetFromDatabase(dataset, new BigQueryDataTypeToLogicalDataTypeMapping()));
     }
 
     @Override
